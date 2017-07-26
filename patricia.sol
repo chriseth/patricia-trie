@@ -65,7 +65,7 @@ contract PatriciaTree {
         e.node = keccak256(value);
         uint previousBranch = 32;
         for (uint i = 0; ; i++) {
-            uint branch = lowestBitSet(branchMask);
+            uint branch = 31 - lowestBitSet(branchMask);
             (k, e.label) = splitAt(k, branch);
             if (branchMask == 0)
                 break;
@@ -85,8 +85,9 @@ contract PatriciaTree {
         Label memory k = Label(keccak256(key), 256);
         values[k.data] = value;
         keys.push(key);
-        rootEdge = insertAtEdge(rootEdge, k, value);
-        root = edgeHash(rootEdge);
+        Edge memory e = insertAtEdge(rootEdge, k, value);
+        //rootEdge = e;
+        //root = edgeHash(e);
     }
     
     // TODO also return the proof (which is basically just the array of encodings of nodes)
@@ -112,32 +113,6 @@ contract PatriciaTree {
         }
         return Edge(newNodeHash, prefix);
     }
-    function splitCommonPrefix(Label check, Label label) internal returns (Label prefix, Label labelSuffix) {
-        return splitAt(label, commonPrefix(check, label));
-    }
-    /// Splits the label at the given position and returns prefix and suffix,
-    /// i.e. prefix.length == pos and prefix.data . suffix.data == l.data.
-    function splitAt(Label l, uint pos) internal returns (Label prefix, Label suffix) {
-        require(pos <= l.length);
-        prefix.length = pos;
-        prefix.data = (l.data >> (32 - pos)) << (32 - pos);
-        suffix.length = l.length - pos;
-        suffix.data = l.data << pos;
-    }
-    function commonPrefix(Label a, Label b) internal returns (uint prefix) {
-        for (prefix = 0; prefix < a.length && prefix < b.length; prefix++)
-            if (a.data[prefix] != b.data[prefix])
-                break;
-    }
-    function removePrefix(Label l, uint prefix) internal returns (Label r) {
-        require(prefix <= l.length);
-        r.length = l.length - prefix;
-        l.data = l.data << prefix;
-    }
-    function chopFirstBit(Label l) internal returns (uint firstBit, Label tail) {
-        require(l.length > 0);
-        return (uint(l.data >> 255), Label(l.data << 1, l.length - 1));
-    }
     function insertValueNode(bytes value) internal returns (bytes32 newHash) {
         // Node memory n;
         // n.isLeaf = true;
@@ -152,14 +127,5 @@ contract PatriciaTree {
     function replaceNode(bytes32 oldHash, Node memory n) internal returns (bytes32 newHash) {
         delete nodes[oldHash];
         return insertNode(n);
-    }
-    function lowestBitSet(uint8 bitfield) returns (uint bit) {
-        for (bit = 31; bit > 0; bit --)
-            if (bitSet(bitfield, bit) != 0)
-                return bit;
-        return 0;
-    }
-    function bitSet(uint8 bitfield, uint bit) returns (uint) {
-        return bitfield & (1 << (31-bit)) != 0 ? 1 : 0;
     }
 }
