@@ -31,10 +31,7 @@ contract PatriciaTree {
     
     // Returns the hash of the encoding of a node.
     function hash(D.Node memory n) internal returns (bytes32) {
-        // if (n.isLeaf)
-        //     return keccak256(n.value);
-        // else
-            return keccak256(edgeHash(n.children[0]), edgeHash(n.children[1]));
+        return keccak256(edgeHash(n.children[0]), edgeHash(n.children[1]));
     }
     
     // // Returns the Merkle-proof for the given key
@@ -42,26 +39,34 @@ contract PatriciaTree {
     // //  - uint8 branchMask - bitmask with high bits at the positions in the key
     // //                    where we have branch nodes (bit in key denotes direction)
     // //  - bytes32[] hashes - hashes of sibling edges
-    // function getProof(bytes key) returns (uint8 branchMask, bytes32[] _siblings) {
-    //     Label memory k = Label(keccak256(key), 256);
-    //     Edge memory e = rootEdge;
-    //     bytes32[256] siblings;
-    //     uint length;
-    //     uint numSiblings;
-    //     while (k.length > 0) {
-    //         var (prefix, suffix) = splitCommonPrefix(e.label, k);
-    //         require(prefix.length == e.label.length);
-    //         length += prefix.length + 1;
-    //         branchMask |= 1 << (32 - length);
-    //         var (head, tail) = chopFirstBit(suffix);
-    //         siblings[numSiblings++] = edgeHash(nodes[e.node].children[1 - head]);
-    //         e = nodes[e.node].children[head];
-    //         k = tail;
-    //     }
-    //     _siblings = new bytes32[](numSiblings);
-    //     for (uint i = 0; i < numSiblings; i++)
-    //         _siblings[i] = siblings[i];
-    // }
+    function getProof(bytes key) returns (uint branchMask, bytes32[] _siblings) {
+        D.Label memory k = D.Label(keccak256(key), 256);
+        D.Edge memory e = rootEdge;
+        bytes32[256] memory siblings;
+        uint length;
+        uint numSiblings;
+        while (true) {
+            var (prefix, suffix) = Utils.splitCommonPrefix(k, e.label);
+            require(prefix.length == e.label.length);
+            if (suffix.length == 0) {
+                // Found it
+                break;
+            }
+            length += prefix.length;
+            branchMask |= uint(1) << (255 - length);
+            length += 1;
+            var (head, tail) = Utils.chopFirstBit(suffix);
+            siblings[numSiblings++] = edgeHash(nodes[e.node].children[1 - head]);
+            e = nodes[e.node].children[head];
+            k = tail;
+        }
+        if (numSiblings > 0)
+        {
+            _siblings = new bytes32[](numSiblings);
+            for (uint i = 0; i < numSiblings; i++)
+                _siblings[i] = siblings[i];
+        }
+    }
 
     // function verifyProof(bytes32 rootHash, bytes key, bytes value, uint8 branchMask, bytes32[] siblings) {
     //     Label memory k = Label(keccak256(key), 256);
@@ -118,8 +123,11 @@ contract PatriciaTree {
         require(key.length >= e.label.length);
         var (prefix, suffix) = Utils.splitCommonPrefix(key, e.label);
         bytes32 newNodeHash;
-        if (prefix.length >= e.label.length) {
-            // Full match, just follow the path
+        if (suffix.length == 0) {
+            // Full match with the key, update operation
+            newNodeHash = value;
+        } else if (prefix.length >= e.label.length) {
+            // Partial match, just follow the path
             newNodeHash = insertAtNode(e.node, suffix, value);
         } else {
             // Mismatch, so let us create a new branch node.
@@ -140,5 +148,23 @@ contract PatriciaTree {
     function replaceNode(bytes32 oldHash, D.Node memory n) internal returns (bytes32 newHash) {
         delete nodes[oldHash];
         return insertNode(n);
+    }
+}
+
+contract PatriciaTreeTest {
+    function test() {
+        testInsert();
+    }
+    function testInsert() internal {
+        PatriciaTree t = new PatriciaTree();
+        t.insert("one", "ONE");
+        t.insert("two", "ONE");
+        t.insert("three", "ONE");
+        t.insert("four", "ONE");
+        t.insert("five", "ONE");
+        t.insert("six", "ONE");
+        t.insert("seven", "ONE");
+        // update
+        t.insert("one", "TWO");
     }
 }
