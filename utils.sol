@@ -72,7 +72,7 @@ library Utils {
     /// Returns the value of the `bit`th bit inside `bitfield`, where
     /// the least significant is the 0th bit.
     function bitSet(uint bitfield, uint bit) internal returns (uint) {
-        return (bitfield & (1 << bit)) != 0 ? 1 : 0;
+        return (bitfield & (uint(1) << bit)) != 0 ? 1 : 0;
     }
 }
 

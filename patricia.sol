@@ -75,8 +75,9 @@ contract PatriciaTree {
         for (uint i = 0; branchMask != 0; i++) {
             uint bitSet = Utils.lowestBitSet(branchMask);
             branchMask &= ~(uint(1) << bitSet);
-            uint bit = Utils.bitSet(uint(k.data), bitSet);
             (k, e.label) = Utils.splitAt(k, 255 - bitSet);
+            uint bit;
+            (bit, e.label) = Utils.chopFirstBit(e.label);
             bytes32[2] memory edgeHashes;
             edgeHashes[bit] = edgeHash(e);
             edgeHashes[1 - bit] = siblings[siblings.length - i - 1];
@@ -147,17 +148,30 @@ contract PatriciaTree {
     }
 }
 
-contract PatriciaTreeTest {
+contract PatriciaTreeTest is PatriciaTree {
     function test() {
-        PatriciaTree t = new PatriciaTree();
-        t.insert("one", "ONE");
-        t.insert("two", "ONE");
-        t.insert("three", "ONE");
-        t.insert("four", "ONE");
-        t.insert("five", "ONE");
-        t.insert("six", "ONE");
-        t.insert("seven", "ONE");
+        //testInsert();
+        testProofs();
+    }
+    function testInsert() internal {
+        insert("one", "ONE");
+        insert("two", "ONE");
+        insert("three", "ONE");
+        insert("four", "ONE");
+        insert("five", "ONE");
+        insert("six", "ONE");
+        insert("seven", "ONE");
         // update
-        t.insert("one", "TWO");
+        insert("one", "TWO");
+    }
+    function testProofs() internal {
+        insert("one", "ONE");
+        var (branchMask, siblings) = getProof("one");
+        verifyProof(root, "one", "ONE", branchMask, siblings);
+        insert("two", "TWO");
+        (branchMask, siblings) = getProof("one");
+        verifyProof(root, "one", "ONE", branchMask, siblings);
+        (branchMask, siblings) = getProof("two");
+        verifyProof(root, "two", "TWO", branchMask, siblings);
     }
 }
