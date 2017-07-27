@@ -53,10 +53,17 @@ library Utils {
     /// More efficient the smaller the result is.
     function lowestBitSet(uint bitfield) internal returns (uint bit) {
         require(bitfield != 0);
+        bytes32 bitfieldBytes = bytes32(bitfield);
+        // First, find the lowest byte set
+        for (uint byteSet = 0; byteSet < 32; byteSet++) {
+            if (bitfieldBytes[31 - byteSet] != 0)
+                break;
+        }
+        uint singleByte = uint(uint8(bitfieldBytes[31 - byteSet]));
         uint mask = 1;
         for (bit = 0; bit < 256; bit ++) {
-            if ((bitfield & mask) != 0)
-                return bit;
+            if ((singleByte & mask) != 0)
+                return 8 * byteSet + bit;
             mask += mask;
         }
         assert(false);

@@ -68,27 +68,27 @@ contract PatriciaTree {
         }
     }
 
-    // function verifyProof(bytes32 rootHash, bytes key, bytes value, uint8 branchMask, bytes32[] siblings) {
-    //     Label memory k = Label(keccak256(key), 256);
-    //     Edge memory e;
-    //     e.node = keccak256(value);
-    //     uint previousBranch = 32;
-    //     for (uint i = 0; ; i++) {
-    //         uint branch = 31 - lowestBitSet(branchMask);
-    //         (k, e.label) = splitAt(k, branch);
-    //         if (branchMask == 0)
-    //             break;
-    //         uint bit = bitSet(uint8(branch), k.length);
-    //         bytes32[2] memory edgeHashes;
-    //         edgeHashes[bit] = edgeHash(e);
-    //         edgeHashes[1 - bit] = siblings[siblings.length - i - 1];
-    //         e.node = keccak256(edgeHashes);
-    //         branchMask &= uint8(~(uint(1) << branch));
-    //         // TODO try to get rid of this
-    //         previousBranch = branch;
-    //     }
-    //     require(rootHash == edgeHash(e));
-    // }
+    function verifyProof(bytes32 rootHash, bytes key, bytes value, uint branchMask, bytes32[] siblings) {
+        D.Label memory k = D.Label(keccak256(key), 256);
+        Edge memory e;
+        e.node = keccak256(value);
+        uint previousBranch = 32;
+        for (uint i = 0; ; i++) {
+            uint branch = Utils.lowestBitSet(branchMask);
+            (k, e.label) = splitAt(k, branch);
+            if (branchMask == 0)
+                break;
+            uint bit = bitSet(uint8(branch), k.length);
+            bytes32[2] memory edgeHashes;
+            edgeHashes[bit] = edgeHash(e);
+            edgeHashes[1 - bit] = siblings[siblings.length - i - 1];
+            e.node = keccak256(edgeHashes);
+            branchMask &= uint8(~(uint(1) << branch));
+            // TODO try to get rid of this
+            previousBranch = branch;
+        }
+        require(rootHash == edgeHash(e));
+    }
     
     function insert(bytes key, bytes value) {
         D.Label memory k = D.Label(keccak256(key), 256);
