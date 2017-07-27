@@ -34,12 +34,12 @@ contract PatriciaTree {
         return keccak256(edgeHash(n.children[0]), edgeHash(n.children[1]));
     }
     
-    // // Returns the Merkle-proof for the given key
-    // // Proof format should be:
-    // //  - uint8 branchMask - bitmask with high bits at the positions in the key
-    // //                    where we have branch nodes (bit in key denotes direction)
-    // //  - bytes32[] hashes - hashes of sibling edges
-    function getProof(bytes key) returns (uint branchMask, bytes32[] _siblings) {
+    // Returns the Merkle-proof for the given key
+    // Proof format should be:
+    //  - uint branchMask - bitmask with high bits at the positions in the key
+    //                    where we have branch nodes (bit in key denotes direction)
+    //  - bytes32[] hashes - hashes of sibling edges
+    function getProof(bytes key) constant returns (uint branchMask, bytes32[] _siblings) {
         D.Label memory k = D.Label(keccak256(key), 256);
         D.Edge memory e = rootEdge;
         bytes32[256] memory siblings;
@@ -68,28 +68,25 @@ contract PatriciaTree {
         }
     }
 
-    function verifyProof(bytes32 rootHash, bytes key, bytes value, uint branchMask, bytes32[] siblings) {
+    function verifyProof(bytes32 rootHash, bytes key, bytes value, uint branchMask, bytes32[] siblings) constant {
         D.Label memory k = D.Label(keccak256(key), 256);
-        Edge memory e;
+        D.Edge memory e;
         e.node = keccak256(value);
-        uint previousBranch = 32;
-        for (uint i = 0; ; i++) {
-            uint branch = Utils.lowestBitSet(branchMask);
-            (k, e.label) = splitAt(k, branch);
-            if (branchMask == 0)
-                break;
-            uint bit = bitSet(uint8(branch), k.length);
+        for (uint i = 0; branchMask != 0; i++) {
+            uint bitSet = Utils.lowestBitSet(branchMask);
+            branchMask &= ~(uint(1) << bitSet);
+            uint bit = Utils.bitSet(uint(k.data), bitSet);
+            (k, e.label) = Utils.splitAt(k, 255 - bitSet);
             bytes32[2] memory edgeHashes;
             edgeHashes[bit] = edgeHash(e);
             edgeHashes[1 - bit] = siblings[siblings.length - i - 1];
             e.node = keccak256(edgeHashes);
-            branchMask &= uint8(~(uint(1) << branch));
-            // TODO try to get rid of this
-            previousBranch = branch;
         }
+        e.label = k;
         require(rootHash == edgeHash(e));
     }
     
+    // TODO also return the proof
     function insert(bytes key, bytes value) {
         D.Label memory k = D.Label(keccak256(key), 256);
         bytes32 valueHash = keccak256(value);
@@ -110,7 +107,6 @@ contract PatriciaTree {
         rootEdge = e;
     }
     
-    // TODO also return the proof (which is basically just the array of encodings of nodes)
     function insertAtNode(bytes32 nodeHash, D.Label key, bytes32 value) internal returns (bytes32) {
         require(key.length > 1);
         D.Node memory n = nodes[nodeHash];
@@ -153,9 +149,6 @@ contract PatriciaTree {
 
 contract PatriciaTreeTest {
     function test() {
-        testInsert();
-    }
-    function testInsert() internal {
         PatriciaTree t = new PatriciaTree();
         t.insert("one", "ONE");
         t.insert("two", "ONE");
