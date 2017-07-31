@@ -2,26 +2,27 @@
 
 
 Specific smart contract that can be used both off-chain and on-chain for verification.
-
-Multiple execution modes:
+Exactly the same code will run off- (for actually performing the computations) and on-chain
+(for settling disputes). The on-chain code will be much faster because it has two
+execution modes (mostly relevant to the underlying data storage):
 
 1) direct:
 
-The smart contract gets the full state (encoded in a certain way) plus the transaction as input.
-It updates the state thereby calculating
+The smart contract gets the full state (encoded in a certain way or just stored in
+storage) plus the transaction as input. It updates the state thereby calculating
 
- (a) helper values for verification,
- (b) Merkle proofs for all reads and writes into the state and
- (c) the new root hash
+    (a) helper values for verification,
+    (b) Merkle proofs for all reads and writes into the state and
+    (c) the new root hash 
 
-2) with helpers:
+2) with helpers / witnesses:
 
 as in 1, just that the helper values that are generated in 1(a) are also added to the input.
 Those are used to speed up the computation like in the following example.
 If this is run with ``_helper == 0``, it will produce a value to be found and a value for helper.
 If that helper value is used in the next run, it will speed up the search. At the same time,
-there is no value for ``_helper`` which can produce a different return value (it will only
-revert in some cases).
+there is no value for ``_helper`` which can produce a different return value (wrong values
+will only cause the transaction to be reverted).
 
     function findValue(uint[] a, uint x, uint _helper) returns (uint value, uint helper) {
       // a is sorted by increasing value
