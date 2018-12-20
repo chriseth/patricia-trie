@@ -1,4 +1,4 @@
-pragma solidity ^0.4.0;
+pragma solidity ^0.5.0;
 
 import {D} from "./data.sol";
 import {Utils} from "./utils.sol";
@@ -13,7 +13,7 @@ contract PatriciaTree {
     bytes32 public root;
     D.Edge rootEdge;
 
-    function getNode(bytes32 hash) constant returns (uint, bytes32, bytes32, uint, bytes32, bytes32) {
+    function getNode(bytes32 hash) view returns (uint, bytes32, bytes32, uint, bytes32, bytes32) {
         var n = nodes[hash];
         return (
             n.children[0].label.length, n.children[0].label.data, n.children[0].node,
@@ -21,7 +21,7 @@ contract PatriciaTree {
         );
     }
 
-    function getRootEdge() constant returns (uint, bytes32, bytes32) {
+    function getRootEdge() view returns (uint, bytes32, bytes32) {
         return (rootEdge.label.length, rootEdge.label.data, rootEdge.node);
     }
     
@@ -39,7 +39,7 @@ contract PatriciaTree {
     //  - uint branchMask - bitmask with high bits at the positions in the key
     //                    where we have branch nodes (bit in key denotes direction)
     //  - bytes32[] hashes - hashes of sibling edges
-    function getProof(bytes key) constant returns (uint branchMask, bytes32[] _siblings) {
+    function getProof(bytes key) view returns (uint branchMask, bytes32[] _siblings) {
         D.Label memory k = D.Label(keccak256(key), 256);
         D.Edge memory e = rootEdge;
         bytes32[256] memory siblings;
@@ -68,7 +68,7 @@ contract PatriciaTree {
         }
     }
 
-    function verifyProof(bytes32 rootHash, bytes key, bytes value, uint branchMask, bytes32[] siblings) constant {
+    function verifyProof(bytes32 rootHash, bytes key, bytes value, uint branchMask, bytes32[] siblings) view {
         D.Label memory k = D.Label(keccak256(key), 256);
         D.Edge memory e;
         e.node = keccak256(value);

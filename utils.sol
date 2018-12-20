@@ -1,16 +1,16 @@
-pragma solidity ^0.4.0;
+pragma solidity ^0.5.0;
 
 import {D} from "./data.sol";
 
 library Utils {
     /// Returns a label containing the longest common prefix of `check` and `label`
     /// and a label consisting of the remaining part of `label`.
-    function splitCommonPrefix(D.Label label, D.Label check) internal returns (D.Label prefix, D.Label labelSuffix) {
+    function splitCommonPrefix(D.Label memory label, D.Label memory check) internal pure returns (D.Label memory prefix, D.Label memory labelSuffix) {
         return splitAt(label, commonPrefix(check, label));
     }
     /// Splits the label at the given position and returns prefix and suffix,
     /// i.e. prefix.length == pos and prefix.data . suffix.data == l.data.
-    function splitAt(D.Label l, uint pos) internal returns (D.Label prefix, D.Label suffix) {
+    function splitAt(D.Label memory l, uint pos) internal pure returns (D.Label memory prefix, D.Label memory suffix) {
         require(pos <= l.length && pos <= 256);
         prefix.length = pos;
         if (pos == 0) {
@@ -22,7 +22,7 @@ library Utils {
         suffix.data = l.data << pos;
     }
     /// Returns the length of the longest common prefix of the two labels.
-    function commonPrefix(D.Label a, D.Label b) internal returns (uint prefix) {
+    function commonPrefix(D.Label memory a, D.Label memory b) internal pure returns (uint prefix) {
         uint length = a.length < b.length ? a.length : b.length;
         // TODO: This could actually use a "highestBitSet" helper
         uint diff = uint(a.data ^ b.data);
@@ -36,14 +36,14 @@ library Utils {
     }
     /// Returns the result of removing a prefix of length `prefix` bits from the
     /// given label (i.e. shifting its data to the left).
-    function removePrefix(D.Label l, uint prefix) internal returns (D.Label r) {
+    function removePrefix(D.Label memory l, uint prefix) internal pure returns (D.Label memory r) {
         require(prefix <= l.length);
         r.length = l.length - prefix;
         r.data = l.data << prefix;
     }
     /// Removes the first bit from a label and returns the bit and a
     /// label containing the rest of the label (i.e. shifted to the left).
-    function chopFirstBit(D.Label l) internal returns (uint firstBit, D.Label tail) {
+    function chopFirstBit(D.Label memory l) internal pure returns (uint firstBit, D.Label memory tail) {
         require(l.length > 0);
         return (uint(l.data >> 255), D.Label(l.data << 1, l.length - 1));
     }
@@ -51,11 +51,12 @@ library Utils {
     /// is the least significant.
     /// Throws if bitfield is zero.
     /// More efficient the smaller the result is.
-    function lowestBitSet(uint bitfield) internal returns (uint bit) {
+    function lowestBitSet(uint bitfield) internal pure returns (uint bit) {
         require(bitfield != 0);
         bytes32 bitfieldBytes = bytes32(bitfield);
         // First, find the lowest byte set
-        for (uint byteSet = 0; byteSet < 32; byteSet++) {
+        uint byteSet = 0;
+        for (; byteSet < 32; byteSet++) {
             if (bitfieldBytes[31 - byteSet] != 0)
                 break;
         }
@@ -71,14 +72,14 @@ library Utils {
     }
     /// Returns the value of the `bit`th bit inside `bitfield`, where
     /// the least significant is the 0th bit.
-    function bitSet(uint bitfield, uint bit) internal returns (uint) {
+    function bitSet(uint bitfield, uint bit) internal pure returns (uint) {
         return (bitfield & (uint(1) << bit)) != 0 ? 1 : 0;
     }
 }
 
 
 contract UtilsTest {
-    function test() {
+    function test() public pure {
         testLowestBitSet();
         testChopFirstBit();
         testRemovePrefix();
@@ -86,13 +87,13 @@ contract UtilsTest {
         testSplitAt();
         testSplitCommonPrefix();
     }
-    function testLowestBitSet() internal {
+    function testLowestBitSet() internal pure {
         require(Utils.lowestBitSet(0x123) == 0);
         require(Utils.lowestBitSet(0x124) == 2);
         require(Utils.lowestBitSet(0x11 << 30) == 30);
         require(Utils.lowestBitSet(1 << 255) == 255);
     }
-    function testChopFirstBit() internal {
+    function testChopFirstBit() internal pure {
         D.Label memory l;
         l.data = hex"ef1230";
         l.length = 20;
@@ -118,7 +119,7 @@ contract UtilsTest {
         require(l.length == 0);
         require(l.data == 0);
     }
-    function testRemovePrefix() internal {
+    function testRemovePrefix() internal pure {
         D.Label memory l;
         l.data = hex"ef1230";
         l.length = 20;
@@ -132,7 +133,7 @@ contract UtilsTest {
         require(l.length == 0);
         require(l.data == 0);
     }
-    function testCommonPrefix() internal {
+    function testCommonPrefix() internal pure {
         D.Label memory a;
         D.Label memory b;
         a.data = hex"abcd";
@@ -149,11 +150,11 @@ contract UtilsTest {
         require(Utils.commonPrefix(a, b) == 3);
         require(Utils.commonPrefix(b, b) == b.length);
     }
-    function testSplitAt() internal {
+    function testSplitAt() internal pure {
         D.Label memory a;
         a.data = hex"abcd";
         a.length = 16;
-        var (x, y) = Utils.splitAt(a, 0);
+        (D.Label memory x, D.Label memory y) = Utils.splitAt(a, 0);
         require(x.length == 0);
         require(y.length == a.length);
         require(y.data == a.data);
@@ -169,14 +170,14 @@ contract UtilsTest {
         require(x.length == a.length);
         require(x.data == a.data);
     }
-    function testSplitCommonPrefix() internal {
+    function testSplitCommonPrefix() internal pure {
         D.Label memory a;
         D.Label memory b;
         a.data = hex"abcd";
         a.length = 16;
         b.data = hex"a0f570";
         b.length = 20;
-        var (prefix, suffix) = Utils.splitCommonPrefix(b, a);
+        (D.Label memory prefix, D.Label memory suffix) = Utils.splitCommonPrefix(b, a);
         require(prefix.length == 4);
         require(prefix.data == hex"a0");
         require(suffix.length == 16);
