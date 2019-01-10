@@ -1,4 +1,4 @@
-pragma solidity ^0.5.0;
+pragma solidity >=0.5.0 <0.6.0;
 
 import {D} from "./data.sol";
 import {Utils} from "./utils.sol";
@@ -13,25 +13,25 @@ contract PatriciaTree {
     bytes32 public root;
     D.Edge rootEdge;
 
-    function getNode(bytes32 hash) view returns (uint, bytes32, bytes32, uint, bytes32, bytes32) {
-        var n = nodes[hash];
+    function getNode(bytes32 hash) public view returns (uint, bytes32, bytes32, uint, bytes32, bytes32) {
+        D.Node memory n = nodes[hash];
         return (
             n.children[0].label.length, n.children[0].label.data, n.children[0].node,
             n.children[1].label.length, n.children[1].label.data, n.children[1].node
         );
     }
 
-    function getRootEdge() view returns (uint, bytes32, bytes32) {
+    function getRootEdge() public view returns (uint, bytes32, bytes32) {
         return (rootEdge.label.length, rootEdge.label.data, rootEdge.node);
     }
     
-    function edgeHash(D.Edge e) internal returns (bytes32) {
-        return keccak256(e.node, e.label.length, e.label.data);
+    function edgeHash(D.Edge memory e) internal view returns (bytes32) {
+        return keccak256(abi.encodePacked(e.node, e.label.length, e.label.data));
     }
     
     // Returns the hash of the encoding of a node.
-    function hash(D.Node memory n) internal returns (bytes32) {
-        return keccak256(edgeHash(n.children[0]), edgeHash(n.children[1]));
+    function hash(D.Node memory n) internal view returns (bytes32) {
+        return keccak256(abi.encodePacked(edgeHash(n.children[0]), edgeHash(n.children[1])));
     }
     
     // Returns the Merkle-proof for the given key
@@ -39,14 +39,16 @@ contract PatriciaTree {
     //  - uint branchMask - bitmask with high bits at the positions in the key
     //                    where we have branch nodes (bit in key denotes direction)
     //  - bytes32[] hashes - hashes of sibling edges
-    function getProof(bytes key) view returns (uint branchMask, bytes32[] _siblings) {
+    function getProof(bytes memory key) public view returns (uint branchMask, bytes32[] memory _siblings) {
         D.Label memory k = D.Label(keccak256(key), 256);
         D.Edge memory e = rootEdge;
         bytes32[256] memory siblings;
         uint length;
         uint numSiblings;
         while (true) {
-            var (prefix, suffix) = Utils.splitCommonPrefix(k, e.label);
+            D.Label memory prefix;
+            D.Label memory suffix;
+            (prefix, suffix) = Utils.splitCommonPrefix(k, e.label);
             require(prefix.length == e.label.length);
             if (suffix.length == 0) {
                 // Found it
@@ -55,7 +57,9 @@ contract PatriciaTree {
             length += prefix.length;
             branchMask |= uint(1) << (255 - length);
             length += 1;
-            var (head, tail) = Utils.chopFirstBit(suffix);
+            uint256 head;
+            D.Label memory tail;
+            (head, tail) = Utils.chopFirstBit(suffix);
             siblings[numSiblings++] = edgeHash(nodes[e.node].children[1 - head]);
             e = nodes[e.node].children[head];
             k = tail;
@@ -68,7 +72,7 @@ contract PatriciaTree {
         }
     }
 
-    function verifyProof(bytes32 rootHash, bytes key, bytes value, uint branchMask, bytes32[] siblings) view {
+    function verifyProof(bytes32 rootHash, bytes memory key, bytes memory value, uint branchMask, bytes32[] memory siblings) public view {
         D.Label memory k = D.Label(keccak256(key), 256);
         D.Edge memory e;
         e.node = keccak256(value);
@@ -81,14 +85,14 @@ contract PatriciaTree {
             bytes32[2] memory edgeHashes;
             edgeHashes[bit] = edgeHash(e);
             edgeHashes[1 - bit] = siblings[siblings.length - i - 1];
-            e.node = keccak256(edgeHashes);
+            e.node = keccak256(abi.encodePacked(edgeHashes));
         }
         e.label = k;
         require(rootHash == edgeHash(e));
     }
     
     // TODO also return the proof
-    function insert(bytes key, bytes value) {
+    function insert(bytes memory key, bytes memory value) public {
         D.Label memory k = D.Label(keccak256(key), 256);
         bytes32 valueHash = keccak256(value);
         values[valueHash] = value;
@@ -108,17 +112,21 @@ contract PatriciaTree {
         rootEdge = e;
     }
     
-    function insertAtNode(bytes32 nodeHash, D.Label key, bytes32 value) internal returns (bytes32) {
+    function insertAtNode(bytes32 nodeHash, D.Label memory key, bytes32 value) internal returns (bytes32) {
         require(key.length > 1);
         D.Node memory n = nodes[nodeHash];
-        var (head, tail) = Utils.chopFirstBit(key);
+        uint256 head;
+        D.Label memory tail;
+        (head, tail) = Utils.chopFirstBit(key);
         n.children[head] = insertAtEdge(n.children[head], tail, value);
         return replaceNode(nodeHash, n);
     }
     
-    function insertAtEdge(D.Edge e, D.Label key, bytes32 value) internal returns (D.Edge) {
+    function insertAtEdge(D.Edge memory e, D.Label memory key, bytes32 value) internal returns (D.Edge memory) {
         require(key.length >= e.label.length);
-        var (prefix, suffix) = Utils.splitCommonPrefix(key, e.label);
+        D.Label memory prefix;
+        D.Label memory suffix;
+        (prefix, suffix) = Utils.splitCommonPrefix(key, e.label);
         bytes32 newNodeHash;
         if (suffix.length == 0) {
             // Full match with the key, update operation
@@ -128,7 +136,9 @@ contract PatriciaTree {
             newNodeHash = insertAtNode(e.node, suffix, value);
         } else {
             // Mismatch, so let us create a new branch node.
-            var (head, tail) = Utils.chopFirstBit(suffix);
+            uint256 head;
+            D.Label memory tail;
+            (head, tail) = Utils.chopFirstBit(suffix);
             D.Node memory branchNode;
             branchNode.children[head] = D.Edge(value, tail);
             branchNode.children[1 - head] = D.Edge(e.node, Utils.removePrefix(e.label, prefix.length + 1));
@@ -149,7 +159,7 @@ contract PatriciaTree {
 }
 
 contract PatriciaTreeTest is PatriciaTree {
-    function test() {
+    function test() public {
         //testInsert();
         testProofs();
     }
@@ -166,7 +176,9 @@ contract PatriciaTreeTest is PatriciaTree {
     }
     function testProofs() internal {
         insert("one", "ONE");
-        var (branchMask, siblings) = getProof("one");
+        uint branchMask;
+        bytes32[] memory siblings;
+        (branchMask, siblings) = getProof("one");
         verifyProof(root, "one", "ONE", branchMask, siblings);
         insert("two", "TWO");
         (branchMask, siblings) = getProof("one");
