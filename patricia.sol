@@ -48,7 +48,7 @@ contract PatriciaTree {
         while (true) {
             D.Label memory prefix;
             D.Label memory suffix;
-            (prefix, suffix) = Utils.splitCommonPrefix(k, e.label);
+            (D.Label memory prefix, D.Label memory suffix) = Utils.splitCommonPrefix(k, e.label);
             require(prefix.length == e.label.length);
             if (suffix.length == 0) {
                 // Found it
