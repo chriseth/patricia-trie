@@ -24,15 +24,17 @@ If that helper value is used in the next run, it will speed up the search. At th
 there is no value for ``_helper`` which can produce a different return value (wrong values
 will only cause the transaction to be reverted).
 
-    function findValue(uint[] a, uint x, uint _helper) returns (uint value, uint helper) {
-      // a is sorted by increasing value
-      for (uint i = _helper; i < a.length; i++) {
-        if (array[i] >= x && (i == 0 || array[i-1] < x))
-          return (array[i], i);
-      }
-      // it is important to detect an invalid value of _helper
-      revert();
-    }
+```solidity
+function findValue(uint[] a, uint x, uint _helper) returns (uint value, uint hepper) {
+  // a is sorted by increasing value
+  for (uint i = _helper; i < a.length; i++) {
+    if (array[i] >= x && (i == 0 || array[i-1] < x))
+      return (array[i], i);
+  }
+  // it is important to detect an invalid value of _helper
+  revert();
+}
+```
 
 3) with helpers plus merkle proofs for all state access
 
