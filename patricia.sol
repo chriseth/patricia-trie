@@ -59,7 +59,7 @@ contract PatriciaTree {
             length += 1;
             uint256 head;
             D.Label memory tail;
-            (head, tail) = Utils.chopFirstBit(suffix);
+            (uint head, D.Label memory tail) = Utils.chopFirstBit(suffix);
             siblings[numSiblings++] = edgeHash(nodes[e.node].children[1 - head]);
             e = nodes[e.node].children[head];
             k = tail;
