@@ -6,12 +6,32 @@ import {Utils} from "./utils.sol";
 contract PatriciaTree {
     // Mapping of hash of key to value
     mapping (bytes32 => bytes) values;
-
     // Particia tree nodes (hash to decoded contents)
     mapping (bytes32 => D.Node) nodes;
     // The current root hash, keccak256(node(path_M('')), path_M(''))
     bytes32 public root;
     D.Edge rootEdge;
+
+    // TODO also return the proof
+    function insert(bytes memory key, bytes memory value) public {
+        D.Label memory k = D.Label(keccak256(key), 256);
+        bytes32 valueHash = keccak256(value);
+        values[valueHash] = value;
+        // keys.push(key);
+        D.Edge memory e;
+        if (rootEdge.node == 0 && rootEdge.label.length == 0)
+        {
+            // Empty Trie
+            e.label = k;
+            e.node = valueHash;
+        }
+        else
+        {
+            e = insertAtEdge(rootEdge, k, valueHash);
+        }
+        root = edgeHash(e);
+        rootEdge = e;
+    }
 
     function getNode(bytes32 hash) public view returns (uint, bytes32, bytes32, uint, bytes32, bytes32) {
         D.Node memory n = nodes[hash];
@@ -23,15 +43,6 @@ contract PatriciaTree {
 
     function getRootEdge() public view returns (uint, bytes32, bytes32) {
         return (rootEdge.label.length, rootEdge.label.data, rootEdge.node);
-    }
-    
-    function edgeHash(D.Edge memory e) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(e.node, e.label.length, e.label.data));
-    }
-    
-    // Returns the hash of the encoding of a node.
-    function hash(D.Node memory n) internal pure returns (bytes32) {
-        return keccak256(abi.encodePacked(edgeHash(n.children[0]), edgeHash(n.children[1])));
     }
     
     // Returns the Merkle-proof for the given key
@@ -88,27 +99,6 @@ contract PatriciaTree {
         require(rootHash == edgeHash(e), "Bad proof");
     }
     
-    // TODO also return the proof
-    function insert(bytes memory key, bytes memory value) public {
-        D.Label memory k = D.Label(keccak256(key), 256);
-        bytes32 valueHash = keccak256(value);
-        values[valueHash] = value;
-        // keys.push(key);
-        D.Edge memory e;
-        if (rootEdge.node == 0 && rootEdge.label.length == 0)
-        {
-            // Empty Trie
-            e.label = k;
-            e.node = valueHash;
-        }
-        else
-        {
-            e = insertAtEdge(rootEdge, k, valueHash);
-        }
-        root = edgeHash(e);
-        rootEdge = e;
-    }
-    
     function insertAtNode(bytes32 nodeHash, D.Label memory key, bytes32 value) internal returns (bytes32) {
         require(key.length > 1, "Bad key");
         D.Node memory n = nodes[nodeHash];
@@ -137,23 +127,36 @@ contract PatriciaTree {
         }
         return D.Edge(newNodeHash, prefix);
     }
+
     function insertNode(D.Node memory n) internal returns (bytes32 newHash) {
         bytes32 h = hash(n);
         nodes[h].children[0] = n.children[0];
         nodes[h].children[1] = n.children[1];
         return h;
     }
+
     function replaceNode(bytes32 oldHash, D.Node memory n) internal returns (bytes32 newHash) {
         delete nodes[oldHash];
         return insertNode(n);
     }
+        
+    function edgeHash(D.Edge memory e) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(e.node, e.label.length, e.label.data));
+    }
+    
+    // Returns the hash of the encoding of a node.
+    function hash(D.Node memory n) internal pure returns (bytes32) {
+        return keccak256(abi.encodePacked(edgeHash(n.children[0]), edgeHash(n.children[1])));
+    }
 }
+
 
 contract PatriciaTreeTest is PatriciaTree {
     function test() public {
         //testInsert();
         testProofs();
     }
+
     function testInsert() internal {
         insert("one", "ONE");
         insert("two", "ONE");
@@ -165,6 +168,7 @@ contract PatriciaTreeTest is PatriciaTree {
         // update
         insert("one", "TWO");
     }
+    
     function testProofs() internal {
         insert("one", "ONE");
         (uint branchMask, bytes32[] memory siblings) = getProof("one");
