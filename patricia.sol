@@ -25,12 +25,12 @@ contract PatriciaTree {
         return (rootEdge.label.length, rootEdge.label.data, rootEdge.node);
     }
     
-    function edgeHash(D.Edge memory e) internal view returns (bytes32) {
+    function edgeHash(D.Edge memory e) internal pure returns (bytes32) {
         return keccak256(abi.encodePacked(e.node, e.label.length, e.label.data));
     }
     
     // Returns the hash of the encoding of a node.
-    function hash(D.Node memory n) internal view returns (bytes32) {
+    function hash(D.Node memory n) internal pure returns (bytes32) {
         return keccak256(abi.encodePacked(edgeHash(n.children[0]), edgeHash(n.children[1])));
     }
     
@@ -46,10 +46,8 @@ contract PatriciaTree {
         uint length;
         uint numSiblings;
         while (true) {
-            D.Label memory prefix;
-            D.Label memory suffix;
             (D.Label memory prefix, D.Label memory suffix) = Utils.splitCommonPrefix(k, e.label);
-            require(prefix.length == e.label.length);
+            require(prefix.length == e.label.length, "Prefix lenght mismatch label lenght");
             if (suffix.length == 0) {
                 // Found it
                 break;
@@ -57,8 +55,6 @@ contract PatriciaTree {
             length += prefix.length;
             branchMask |= uint(1) << (255 - length);
             length += 1;
-            uint256 head;
-            D.Label memory tail;
             (uint head, D.Label memory tail) = Utils.chopFirstBit(suffix);
             siblings[numSiblings++] = edgeHash(nodes[e.node].children[1 - head]);
             e = nodes[e.node].children[head];
@@ -72,13 +68,14 @@ contract PatriciaTree {
         }
     }
 
-    function verifyProof(bytes32 rootHash, bytes memory key, bytes memory value, uint branchMask, bytes32[] memory siblings) public view {
+    function verifyProof(bytes32 rootHash, bytes memory key, bytes memory value, uint branchMask, bytes32[] memory siblings) public pure {
         D.Label memory k = D.Label(keccak256(key), 256);
         D.Edge memory e;
         e.node = keccak256(value);
-        for (uint i = 0; branchMask != 0; i++) {
-            uint bitSet = Utils.lowestBitSet(branchMask);
-            branchMask &= ~(uint(1) << bitSet);
+        uint b = branchMask;
+        for (uint i = 0; b != 0; i++) {
+            uint bitSet = Utils.lowestBitSet(b);
+            b &= ~(uint(1) << bitSet);
             (k, e.label) = Utils.splitAt(k, 255 - bitSet);
             uint bit;
             (bit, e.label) = Utils.chopFirstBit(e.label);
@@ -88,7 +85,7 @@ contract PatriciaTree {
             e.node = keccak256(abi.encodePacked(edgeHashes));
         }
         e.label = k;
-        require(rootHash == edgeHash(e));
+        require(rootHash == edgeHash(e), "Bad proof");
     }
     
     // TODO also return the proof
@@ -113,20 +110,16 @@ contract PatriciaTree {
     }
     
     function insertAtNode(bytes32 nodeHash, D.Label memory key, bytes32 value) internal returns (bytes32) {
-        require(key.length > 1);
+        require(key.length > 1, "Bad key");
         D.Node memory n = nodes[nodeHash];
-        uint256 head;
-        D.Label memory tail;
-        (head, tail) = Utils.chopFirstBit(key);
+        (uint256 head, D.Label memory tail) = Utils.chopFirstBit(key);
         n.children[head] = insertAtEdge(n.children[head], tail, value);
         return replaceNode(nodeHash, n);
     }
     
     function insertAtEdge(D.Edge memory e, D.Label memory key, bytes32 value) internal returns (D.Edge memory) {
-        require(key.length >= e.label.length);
-        D.Label memory prefix;
-        D.Label memory suffix;
-        (prefix, suffix) = Utils.splitCommonPrefix(key, e.label);
+        require(key.length >= e.label.length, "Key lenght mismatch label lenght");
+        (D.Label memory prefix, D.Label memory suffix) = Utils.splitCommonPrefix(key, e.label);
         bytes32 newNodeHash;
         if (suffix.length == 0) {
             // Full match with the key, update operation
@@ -136,9 +129,7 @@ contract PatriciaTree {
             newNodeHash = insertAtNode(e.node, suffix, value);
         } else {
             // Mismatch, so let us create a new branch node.
-            uint256 head;
-            D.Label memory tail;
-            (head, tail) = Utils.chopFirstBit(suffix);
+            (uint256 head, D.Label memory tail) = Utils.chopFirstBit(suffix);
             D.Node memory branchNode;
             branchNode.children[head] = D.Edge(value, tail);
             branchNode.children[1 - head] = D.Edge(e.node, Utils.removePrefix(e.label, prefix.length + 1));
@@ -176,9 +167,7 @@ contract PatriciaTreeTest is PatriciaTree {
     }
     function testProofs() internal {
         insert("one", "ONE");
-        uint branchMask;
-        bytes32[] memory siblings;
-        (branchMask, siblings) = getProof("one");
+        (uint branchMask, bytes32[] memory siblings) = getProof("one");
         verifyProof(root, "one", "ONE", branchMask, siblings);
         insert("two", "TWO");
         (branchMask, siblings) = getProof("one");
